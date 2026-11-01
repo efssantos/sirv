@@ -34,6 +34,14 @@ python .\src\vehicle_detector.py --source 0
 python .\src\vehicle_detector.py --source "rtsp://endereco-do-stream"
 ```
 
+Por padrão, a inferência usa resolução 960 e confiança mínima 0,15 para ajudar a localizar veículos menores, como motos distantes. Isso exige mais processamento. Ajuste esses valores conforme a câmera e o computador:
+
+```powershell
+python .\src\vehicle_detector.py --source .\data\videos\rodovia.mp4 --imgsz 1280 --conf 0.10
+```
+
+Uma confiança menor ou uma resolução maior pode aumentar detecções incorretas ou reduzir o FPS. A classe de moto usa o modelo YOLO pré-treinado; o resultado ainda depende da qualidade e do enquadramento da imagem.
+
 O modelo `yolo11s.pt` deve ficar na raiz do projeto. O repositório já inclui esse arquivo.
 
 ## Encerrar

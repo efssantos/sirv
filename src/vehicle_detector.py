@@ -17,8 +17,8 @@ from ultralytics import YOLO
 # Paths and detector settings.
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = PROJECT_DIR / "yolo11s.pt"
-IMAGE_SIZE = 640
-CONFIDENCE = 0.25
+IMAGE_SIZE = 960
+CONFIDENCE = 0.15
 TRACKER_CONFIG = "bytetrack.yaml"
 DEVICE = "cpu"
 RECONNECT_INTERVAL_SECONDS = 2.0
@@ -31,7 +31,7 @@ CLASS_NAMES = {
 }
 
 
-def obter_fonte() -> tuple[str | int, bool]:
+def obter_fonte() -> tuple[str | int, bool, int, float]:
     """Read camera/stream arguments or open the video file picker."""
     parser = argparse.ArgumentParser(
         description="Detecta e rastreia veículos em vídeo ou câmera ao vivo."
@@ -41,7 +41,24 @@ def obter_fonte() -> tuple[str | int, bool]:
         "--source",
         help="Arquivo, índice da câmera (ex.: 0) ou URL de stream (ex.: RTSP).",
     )
+    parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=IMAGE_SIZE,
+        help=f"Resolução de inferência (padrão: {IMAGE_SIZE}; maior ajuda em objetos distantes, mas reduz o FPS).",
+    )
+    parser.add_argument(
+        "--conf",
+        type=float,
+        default=CONFIDENCE,
+        help=f"Confiança mínima entre 0 e 1 (padrão: {CONFIDENCE}).",
+    )
     args = parser.parse_args()
+
+    if args.imgsz < 32:
+        parser.error("--imgsz deve ser pelo menos 32.")
+    if not 0 < args.conf <= 1:
+        parser.error("--conf deve ser maior que 0 e no máximo 1.")
 
     if args.source and args.input:
         parser.error("Informe a fonte por --source ou como argumento posicional, não ambos.")
@@ -61,20 +78,20 @@ def obter_fonte() -> tuple[str | int, bool]:
         finally:
             root.destroy()
         if not selected:
-            return "", False
-        return str(Path(selected).expanduser()), False
+            return "", False, args.imgsz, args.conf
+        return str(Path(selected).expanduser()), False, args.imgsz, args.conf
 
     source = requested_source.strip()
     if source.isdecimal():
-        return int(source), True
+        return int(source), True, args.imgsz, args.conf
     if source.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
-        return source, True
+        return source, True, args.imgsz, args.conf
 
     path = Path(source).expanduser()
     if path.is_file():
-        return str(path), False
+        return str(path), False, args.imgsz, args.conf
     print(f"Fonte não encontrada: {path}")
-    return "", False
+    return "", False, args.imgsz, args.conf
 
 
 def abrir_fonte(source: str | int) -> cv2.VideoCapture:
@@ -128,7 +145,7 @@ def imprimir_relatorio(vehicle_counts: dict[str, set[int]]) -> None:
 
 def iniciar_detector() -> None:
     """Run vehicle detection on a file, local camera, or network stream."""
-    source, is_live = obter_fonte()
+    source, is_live, image_size, confidence = obter_fonte()
     if source == "":
         print("Nenhuma fonte selecionada. Encerrando.")
         return
@@ -189,8 +206,8 @@ def iniciar_detector() -> None:
                 frame,
                 persist=True,
                 tracker=TRACKER_CONFIG,
-                imgsz=IMAGE_SIZE,
-                conf=CONFIDENCE,
+                imgsz=image_size,
+                conf=confidence,
                 iou=0.45,
                 classes=list(VEHICLE_CLASSES),
                 device=DEVICE,
