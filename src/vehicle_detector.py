@@ -1,4 +1,4 @@
-"""Detecta, rastreia e conta veículos em um vídeo."""
+﻿"""Detecta, rastreia e conta veículos em um vídeo."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 from tkinter import Tk, filedialog
-from typing import DefaultDict, Deque, Optional
+from typing import DefaultDict, Deque
 
 import cv2
 import numpy as np
@@ -21,6 +21,7 @@ IMAGE_SIZE = 640
 CONFIDENCE = 0.25
 TRACKER_CONFIG = "bytetrack.yaml"
 DEVICE = "cpu"
+RECONNECT_INTERVAL_SECONDS = 2.0
 VEHICLE_CLASSES = (2, 3, 5, 7)
 CLASS_NAMES = {
     2: "Carro",
@@ -142,16 +143,18 @@ def iniciar_detector() -> None:
     model = YOLO(str(MODEL_PATH))
     capture = abrir_fonte(source)
     if not capture.isOpened():
+        capture.release()
         print("Não foi possível abrir a fonte. Verifique o índice, URL e conexão.")
         return
 
     vehicle_counts: DefaultDict[str, set[int]] = defaultdict(set)
     fps_history: Deque[float] = deque(maxlen=30)
-    previous_time = time.time()
+    previous_time = time.perf_counter()
     track_id_offset = 0
-    cv2.namedWindow("SIRV - Monitoramento de Veículos", cv2.WINDOW_NORMAL)
+    window_name = "SIRV - Monitoramento de Veículos"
 
     try:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
         while True:
             success, frame = capture.read()
             if not success:
@@ -162,7 +165,7 @@ def iniciar_detector() -> None:
                 print("\nSinal da câmera perdido. Tentando reconectar...")
                 capture.release()
                 while True:
-                    key = cv2.waitKey(500) & 0xFF
+                    key = cv2.waitKey(int(RECONNECT_INTERVAL_SECONDS * 1000)) & 0xFF
                     if key in (27, ord("q")):
                         return
                     capture = abrir_fonte(source)
@@ -170,6 +173,7 @@ def iniciar_detector() -> None:
                         print("Câmera reconectada.")
                         break
                     capture.release()
+                    print("Reconexão falhou. Nova tentativa em 2 segundos; pressione Q para sair.")
 
                 # Start a fresh tracker and keep IDs unique in the report.
                 model = YOLO(str(MODEL_PATH))
@@ -223,7 +227,7 @@ def iniciar_detector() -> None:
                         2,
                     )
 
-            current_time = time.time()
+            current_time = time.perf_counter()
             elapsed = current_time - previous_time
             previous_time = current_time
             if elapsed > 0:
@@ -231,7 +235,7 @@ def iniciar_detector() -> None:
             fps = sum(fps_history) / len(fps_history) if fps_history else 0.0
             desenhar_painel(frame, vehicle_counts, fps)
 
-            cv2.imshow("SIRV - Monitoramento de Veículos", frame)
+            cv2.imshow(window_name, frame)
             key = cv2.waitKey(1) & 0xFF
             if key in (27, ord("q")):
                 print("\nExecução interrompida pelo usuário.")
@@ -245,3 +249,6 @@ def iniciar_detector() -> None:
 
 if __name__ == "__main__":
     iniciar_detector()
+
+
+
