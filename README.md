@@ -44,6 +44,20 @@ Uma confiança menor ou uma resolução maior pode aumentar detecções incorret
 
 O programa seleciona automaticamente a primeira GPU NVIDIA compatível com CUDA. **Se a máquina não tiver uma GPU compatível, ou se o PyTorch não tiver CUDA disponível, ele roda na CPU automaticamente.** Para escolher manualmente, use `--device 0` (GPU) ou `--device cpu`. A aceleração por GPU requer uma GPU NVIDIA, driver compatível e uma instalação CUDA do PyTorch; confira a mensagem de inicialização para saber qual dispositivo está sendo usado.
 
+### Ativar GPU NVIDIA no Windows
+
+Se o programa informar que CUDA não está disponível, instale uma compilação CUDA do PyTorch no mesmo ambiente virtual usado para executar o SIRV:
+
+1. Ative `.venv` conforme as instruções de instalação acima.
+2. Abra o [seletor oficial de instalação do PyTorch](https://pytorch.org/get-started/locally/) e escolha **Windows**, **Pip**, **Python** e uma opção **CUDA** compatível com a placa e o driver. Execute o comando gerado no PowerShell, com `.venv` ainda ativado. Não escolha **CPU**.
+3. Confirme que esse Python reconhece a GPU:
+
+```powershell
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CUDA indisponível')"
+```
+
+O resultado de `torch.cuda.is_available()` precisa ser `True`. Depois, inicie o SIRV normalmente; ele selecionará a GPU automaticamente. O comando de instalação varia conforme as opções CUDA oferecidas pelo PyTorch, então use o comando atual gerado pelo seletor oficial.
+
 O modelo `yolo11s.pt` deve ficar na raiz do projeto. O repositório já inclui esse arquivo.
 
 ## Encerrar
