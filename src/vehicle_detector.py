@@ -11,6 +11,7 @@ from typing import DefaultDict, Deque
 
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 
 
@@ -20,7 +21,6 @@ MODEL_PATH = PROJECT_DIR / "yolo11s.pt"
 IMAGE_SIZE = 960
 CONFIDENCE = 0.15
 TRACKER_CONFIG = "bytetrack.yaml"
-DEVICE = "cpu"
 RECONNECT_INTERVAL_SECONDS = 2.0
 VEHICLE_CLASSES = (2, 3, 5, 7)
 CLASS_NAMES = {
@@ -31,7 +31,7 @@ CLASS_NAMES = {
 }
 
 
-def obter_fonte() -> tuple[str | int, bool, int, float]:
+def obter_fonte() -> tuple[str | int, bool, int, float, str]:
     """Read camera/stream arguments or open the video file picker."""
     parser = argparse.ArgumentParser(
         description="Detecta e rastreia veículos em vídeo ou câmera ao vivo."
@@ -53,12 +53,30 @@ def obter_fonte() -> tuple[str | int, bool, int, float]:
         default=CONFIDENCE,
         help=f"Confiança mínima entre 0 e 1 (padrão: {CONFIDENCE}).",
     )
+    parser.add_argument(
+        "--device",
+        default="auto",
+        help="Dispositivo: auto (padrão), cpu ou índice da GPU NVIDIA, como 0.",
+    )
     args = parser.parse_args()
 
     if args.imgsz < 32:
         parser.error("--imgsz deve ser pelo menos 32.")
     if not 0 < args.conf <= 1:
         parser.error("--conf deve ser maior que 0 e no máximo 1.")
+    if args.device.lower() == "auto":
+        device = "0" if torch.cuda.is_available() else "cpu"
+    elif args.device.lower() == "cpu":
+        device = "cpu"
+    elif args.device.isdecimal():
+        if not torch.cuda.is_available():
+            parser.error(
+                "GPU solicitada, mas o PyTorch instalado não tem CUDA disponível. "
+                "Instale uma versão CUDA do PyTorch compatível com sua GPU e driver."
+            )
+        device = args.device
+    else:
+        parser.error("--device aceita auto, cpu ou o índice de uma GPU NVIDIA (ex.: 0).")
 
     if args.source and args.input:
         parser.error("Informe a fonte por --source ou como argumento posicional, não ambos.")
@@ -78,20 +96,20 @@ def obter_fonte() -> tuple[str | int, bool, int, float]:
         finally:
             root.destroy()
         if not selected:
-            return "", False, args.imgsz, args.conf
-        return str(Path(selected).expanduser()), False, args.imgsz, args.conf
+            return "", False, args.imgsz, args.conf, device
+        return str(Path(selected).expanduser()), False, args.imgsz, args.conf, device
 
     source = requested_source.strip()
     if source.isdecimal():
-        return int(source), True, args.imgsz, args.conf
+        return int(source), True, args.imgsz, args.conf, device
     if source.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
-        return source, True, args.imgsz, args.conf
+        return source, True, args.imgsz, args.conf, device
 
     path = Path(source).expanduser()
     if path.is_file():
-        return str(path), False, args.imgsz, args.conf
+        return str(path), False, args.imgsz, args.conf, device
     print(f"Fonte não encontrada: {path}")
-    return "", False, args.imgsz, args.conf
+    return "", False, args.imgsz, args.conf, device
 
 
 def abrir_fonte(source: str | int) -> cv2.VideoCapture:
@@ -145,7 +163,7 @@ def imprimir_relatorio(vehicle_counts: dict[str, set[int]]) -> None:
 
 def iniciar_detector() -> None:
     """Run vehicle detection on a file, local camera, or network stream."""
-    source, is_live, image_size, confidence = obter_fonte()
+    source, is_live, image_size, confidence, device = obter_fonte()
     if source == "":
         print("Nenhuma fonte selecionada. Encerrando.")
         return
@@ -156,6 +174,10 @@ def iniciar_detector() -> None:
 
     source_label = "câmera/stream ao vivo" if is_live else "vídeo"
     print(f"\nFonte selecionada ({source_label}).")
+    if device == "cpu":
+        print("Dispositivo de inferência: CPU.")
+    else:
+        print(f"Dispositivo de inferência: GPU {device} ({torch.cuda.get_device_name(int(device))}).")
     print("Carregando modelo YOLO...")
     model = YOLO(str(MODEL_PATH))
     capture = abrir_fonte(source)
@@ -210,7 +232,7 @@ def iniciar_detector() -> None:
                 conf=confidence,
                 iou=0.45,
                 classes=list(VEHICLE_CLASSES),
-                device=DEVICE,
+                device=device,
                 verbose=False,
             )
             boxes = results[0].boxes

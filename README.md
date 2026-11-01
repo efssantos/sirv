@@ -42,6 +42,8 @@ python .\src\vehicle_detector.py --source .\data\videos\rodovia.mp4 --imgsz 1280
 
 Uma confiança menor ou uma resolução maior pode aumentar detecções incorretas ou reduzir o FPS. A classe de moto usa o modelo YOLO pré-treinado; o resultado ainda depende da qualidade e do enquadramento da imagem.
 
+O programa seleciona automaticamente a primeira GPU NVIDIA compatível com CUDA. **Se a máquina não tiver uma GPU compatível, ou se o PyTorch não tiver CUDA disponível, ele roda na CPU automaticamente.** Para escolher manualmente, use `--device 0` (GPU) ou `--device cpu`. A aceleração por GPU requer uma GPU NVIDIA, driver compatível e uma instalação CUDA do PyTorch; confira a mensagem de inicialização para saber qual dispositivo está sendo usado.
+
 O modelo `yolo11s.pt` deve ficar na raiz do projeto. O repositório já inclui esse arquivo.
 
 ## Encerrar
