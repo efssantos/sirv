@@ -187,6 +187,7 @@ def iniciar_detector() -> None:
         return
 
     vehicle_counts: DefaultDict[str, set[int]] = defaultdict(set)
+    vehicle_categories: dict[int, str] = {}
     fps_history: Deque[float] = deque(maxlen=30)
     previous_time = time.perf_counter()
     track_id_offset = 0
@@ -249,6 +250,10 @@ def iniciar_detector() -> None:
                     category = CLASS_NAMES.get(class_id, "Desconhecido")
                     if vehicle_id is not None:
                         vehicle_id = int(vehicle_id) + track_id_offset
+                        previous_category = vehicle_categories.get(vehicle_id)
+                        if previous_category is not None and previous_category != category:
+                            vehicle_counts[previous_category].discard(vehicle_id)
+                        vehicle_categories[vehicle_id] = category
                         vehicle_counts[category].add(vehicle_id)
                         label = f"ID {vehicle_id} - {category}"
                     else:
