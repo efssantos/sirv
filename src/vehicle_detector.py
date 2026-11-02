@@ -1,6 +1,4 @@
-﻿"""Detecta, rastreia e conta veículos em um vídeo."""
-
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import time
@@ -15,7 +13,7 @@ import torch
 from ultralytics import YOLO
 
 
-# Paths and detector settings.
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = PROJECT_DIR / "yolo11s.pt"
 IMAGE_SIZE = 960
@@ -32,14 +30,13 @@ CLASS_NAMES = {
 
 
 def obter_fonte() -> tuple[str | int, bool, int, float, str]:
-    """Read camera/stream arguments or open the video file picker."""
     parser = argparse.ArgumentParser(
-        description="Detecta e rastreia veículos em vídeo ou câmera ao vivo."
+        description="Detecção e rastreamento de veículos usando YOLOv8 e ByteTrack. "
     )
     parser.add_argument("input", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument(
         "--source",
-        help="Arquivo, índice da câmera (ex.: 0) ou URL de stream (ex.: RTSP).",
+        help="Arquivos de vídeo, índice da câmera ou URL de stream (ex.: rtsp://...). Se não fornecido, uma caixa de diálogo será exibida.",
     )
     parser.add_argument(
         "--imgsz",
@@ -113,7 +110,6 @@ def obter_fonte() -> tuple[str | int, bool, int, float, str]:
 
 
 def abrir_fonte(source: str | int) -> cv2.VideoCapture:
-    """Open a local camera, network stream, or video file."""
     if isinstance(source, int):
         capture = cv2.VideoCapture(source, cv2.CAP_DSHOW)
     elif source.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
@@ -122,13 +118,11 @@ def abrir_fonte(source: str | int) -> cv2.VideoCapture:
         capture = cv2.VideoCapture(source)
 
     if capture.isOpened():
-        # Reduce buffering where supported so live overlays stay near real time.
         capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     return capture
 
 
 def desenhar_painel(frame: np.ndarray, counts: dict[str, set[int]], fps: float) -> None:
-    """Draw summary counts over the current video frame."""
     total = sum(len(vehicle_ids) for vehicle_ids in counts.values())
     lines = [
         f"FPS: {fps:.1f}",
@@ -151,7 +145,6 @@ def desenhar_painel(frame: np.ndarray, counts: dict[str, set[int]], fps: float) 
 
 
 def imprimir_relatorio(vehicle_counts: dict[str, set[int]]) -> None:
-    """Print the final vehicle totals by category."""
     total = sum(len(vehicle_ids) for vehicle_ids in vehicle_counts.values())
     print("\n========== RELATORIO FINAL ==========")
     print(f"Total de veiculos: {total}")
@@ -215,7 +208,6 @@ def iniciar_detector() -> None:
                     capture.release()
                     print("Reconexão falhou. Nova tentativa em 2 segundos; pressione Q para sair.")
 
-                # Start a fresh tracker and keep IDs unique in the report.
                 model = YOLO(str(MODEL_PATH))
                 existing_ids = [
                     vehicle_id
@@ -293,6 +285,3 @@ def iniciar_detector() -> None:
 
 if __name__ == "__main__":
     iniciar_detector()
-
-
-
